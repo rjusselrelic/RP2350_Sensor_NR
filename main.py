@@ -159,14 +159,14 @@ def run():
 #add to memory leak
 def drip():
     print("drip...")
-    memory_leak_list.append(os.urandom(2048))
+    memory_leak_list.append(os.urandom(1664))
 
 if __name__ == "__main__":
 
     print("Starting NewRelic IoT Sensor Demo...")
+    print("Memory leak mode: ", memory_leak_mode)
     gc.enable()
     read_and_set_mode()
-    print("Memory leak mode: ", memory_leak_mode)
 
     print("Checking config...")
     configError = check_config()
@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
 while True:
     try:
-        if((runs > 700) & memory_leak_mode) :
+        if((runs > 300) & memory_leak_mode) :
             reset()
 
         gc.collect()
