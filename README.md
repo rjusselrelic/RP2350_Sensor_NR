@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This project is an example of an embedded IoT device being instrumented with New Relic
+This project is an example of an embedded IoT device being instrumented with New Relic.
+
+The hardware for this device is open sourced in this [repository](https://github.com/NickTVA/RP2350_Sensor_NR_Kicad)
 
 It contains an RP2350 microcontroller with firmware in micropython, a BME280 and BH1750 to send environmental data.
 There is a lightweight agent to send the environmental data as well as resource utilization about the device itself.
