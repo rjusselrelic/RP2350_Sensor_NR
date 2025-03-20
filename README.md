@@ -7,6 +7,8 @@ This project is an example of an embedded IoT device being instrumented with New
 It contains an RP2350 microcontroller with firmware in micropython, a BME280 and BH1750 to send environmental data.
 There is a lightweight agent to send the environmental data as well as resource utilization about the device itself.
 
+![normal_mode.png](images/normal_mode.png)
+
 A device similar to this could be used to measure the effectiveness of an automated building HVAC control system.  
 Temperature, and Humidity could determine if any rooms are out of range.  Pressure could be use to determine if there is a problem with a 
 make up air system or positive/negative room pressure isolation systems.
@@ -54,11 +56,14 @@ and pressing the reset button or holding down on SW3 while plugging it in.
 The device will indicate memory leak mode has been entered but illuminating
 the red and yellow (D1 and D2) LED's.  The device will leak memory for about 45 minutes or so
 until crashing.  This will **not** harm the device.  In NewRelic you should be
-able to see memory ulitization climb until the device can no longer allocate
+able to see memory utilization climb until the device can no longer allocate
 memory and crash.  It will stop reporting metrics:
 
 ![dash2.png](images/dash2.png)
 
+![memory_leak.png](images/memory_leak.png)
+
+You may or may not get an error message similar to the above on the OLED, as crashes are unpredictable.
 After crashing, a reset is needed either by hitting the reset button or unplugging and plugging the device back in.
 
 
