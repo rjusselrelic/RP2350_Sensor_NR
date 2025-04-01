@@ -109,13 +109,24 @@ def connect_wifi(i2c):
         display.text(SSID, 0, 15)
         display.show()
         time.sleep(2)
-        if wlan_connection_attempts > 30:
+        
+        if (wlan_connection_attempts % 10) == 0 :
+            wlan.active(False)
+            time.sleep(15)
+            rp2.country(WIFI_REGION_CODE)
+            wlan = network.WLAN(network.STA_IF)
+            wlan.active(True)
+            wlan.connect(SSID, PASSCODE)
+        
+        if wlan_connection_attempts > 120:
             reset()
     print(wlan.ifconfig())
 
 
 # read sensors, display on oled, and send to NR
 def run():
+    
+        
     #    if (runs % 5) == 0:
     report_system_metrics()
 
@@ -217,6 +228,10 @@ while True:
 
         gc.collect()
         print("\nRun: {:d}".format(runs))
+        
+        if not wlan.isconnected() or wlan.status() < 0:
+            connect_wifi(i2c)
+        
         run()
         runs += 1
 
