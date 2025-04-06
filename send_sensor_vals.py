@@ -3,10 +3,11 @@ import json
 import os
 import time
 import requests
+import random
 from NR_metric import NRMetricElement, Attributes, Metric
 
 from credentials import NR_API_KEY
-from environment import HOSTNAME, APPNAME, metrics_url, logs_url
+from environment import HOSTNAME, APPNAME, metrics_url, logs_url, trace_url
 
 #depending on hardware and micropython libraries time may be UTC or local
 #the NR API requires UTC or it will give a 202 and then throw the data away
@@ -106,4 +107,49 @@ def send_log_to_nr(message, unix_timestamp):
     r.close()
     gc.collect()
     return http_status_code
+
+def send_trace_to_nr(trace_id, span_id, duration_ms, unix_timestamp):
+
+    trace = {}
+
+    common_attributes = {}
+    common_attributes['service.name'] = "IoT Service"
+    common_attributes['host'] = "rp2350"
+    common_data = {}
+    common_data['attributes'] = common_attributes
+    
+    span_attributes = {}
+    span_attributes['duration.ms'] = duration_ms
+    span_attributes['name'] = "/get"
+    span_attributes['service.name'] ="IOT-Demo"
+    span_attributes['host'] = "rp2350"
+    
+    span = {}
+    
+    
+    span['trace.id'] = trace_id
+    span['id'] = span_id
+    span['timestamp'] = unix_timestamp * 1000
+    span['attributes'] = span_attributes
+    
+#    trace['common'] = common_data
+    trace['spans'] = [span]
+    
+    
+    # send the NR Log
+    send_bytes_string = json.dumps([trace])
+    print(send_bytes_string)
+    send_bytes = send_bytes_string.encode()
+    header_data = {"Content-Type": "application/json", "Api-Key": NR_API_KEY,
+                   "Data-Format" : "newrelic", "Data-Format-Version" : "1"}
+    r = requests.post(trace_url, data=send_bytes, headers=header_data, timeout=20)
+    http_status_code = r.status_code
+    print(r.status_code)
+    r.close()
+    gc.collect()
+    
+
+    
+    
+    return r.status_code
 

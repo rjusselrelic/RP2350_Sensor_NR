@@ -3,17 +3,25 @@ import time
 
 import BME280
 import network
+import requests
 import ntptime
+import utime
 import os
 import rp2
 import ssd1306
 from bh1750 import BH1750
 from machine import Pin, I2C, reset
-
 import send_sensor_vals
 from credentials import SSID, PASSCODE, NR_API_KEY
-from environment import HOSTNAME, APPNAME, metrics_url, logs_url, WIFI_REGION_CODE
-from send_sensor_vals import send_log_to_nr, send_env_metric_to_nr, report_system_metrics, UTC_OFFSET_HOURS
+from environment import HOSTNAME, APPNAME, metrics_url, logs_url, WIFI_REGION_CODE, RFID_API_URL, RFID_ENABLE
+from send_sensor_vals import send_log_to_nr, send_env_metric_to_nr, send_trace_to_nr, report_system_metrics, UTC_OFFSET_HOURS
+
+
+
+if(RFID_ENABLE) :
+    from mfrc522 import MFRC522
+
+METRICS_POLL_TIME = 9
 
 print("MAIN")
 
@@ -26,6 +34,9 @@ red_led = Pin(RED_PIN_NUMBER, Pin.OUT)
 yellow_led = Pin(YELLOW_PIN_NUMBER, Pin.OUT)
 
 sw3 =  Pin(15, Pin.IN, Pin.PULL_UP)
+
+
+rfid_interrupt = Pin(16, Pin.IN)
 
 global wlan
 
@@ -172,6 +183,36 @@ def drip():
     print("drip...")
     memory_leak_list.append(os.urandom(1664))
 
+
+def get_api_get(tag, traceparent, tracecontext):
+    header_data = {"traceparent": traceparent, "tracestate": "newrelic="+tracecontext}
+    print(header_data)
+    rfid_response = requests.get(RFID_API_URL + "/get?tag=" + tag, headers=header_data)
+    print(rfid_response.status_code)
+    print(rfid_response.text)
+    if(rfid_response.status_code == 200) :
+        return rfid_response.text
+    return "DENIED"
+
+def handle_card(tag_id) :
+    
+    start_ms = utime.ticks_ms()
+    trace_id_bytes = os.urandom(16)
+    trace_id_string = ''.join('{:02x}'.format(x) for x in trace_id_bytes)
+    
+    span_id_bytes = os.urandom(8)
+    span_id_string = ''.join('{:02x}'.format(x) for x in span_id_bytes)
+
+    traceparent = "00-" + trace_id_string + "-" + span_id_string + "-01"    
+    response_text = get_api_get(tag_id, traceparent, span_id_string)
+    stop_ms = utime.ticks_ms()
+    
+    duration_ms = stop_ms - start_ms
+    send_trace_to_nr(trace_id_string, span_id_string, duration_ms, time.time())
+    
+    return response_text
+
+
 if __name__ == "__main__":
 
     print("Starting NewRelic IoT Sensor Demo...")
@@ -198,15 +239,21 @@ if __name__ == "__main__":
     ntptime.settime()
 
     send_sensor_vals.report_system_metrics()
-
+    
     display = ssd1306.SSD1306_I2C(128, 32, i2c)
     display.text("WIFI CONNECTED", 0, 0)
     init_timestamp = time.time()
     init_timestamp += (UTC_OFFSET_HOURS * 3600)
     display.text(str(init_timestamp), 0, 15)
     display.show()
-    time.sleep(5)
 
+
+    if(RFID_ENABLE) :
+        reader = MFRC522(spi_id=0,sck=6,miso=4,mosi=7,cs=5,rst=22)
+        reader.init()
+
+    time.sleep(5)
+    
     log_timestamp = time.time()
     log_timestamp += (UTC_OFFSET_HOURS * 3600)
     send_log_to_nr("RP2350 startup", log_timestamp)
@@ -220,25 +267,42 @@ if __name__ == "__main__":
 
     runs = 0
 
+    last_metric_timestamp = 0;
 
 while True:
-    try:
+    try:        
         if((runs > 300) & memory_leak_mode) :
             reset()
 
-        gc.collect()
-        print("\nRun: {:d}".format(runs))
         
         if not wlan.isconnected() or wlan.status() < 0:
             connect_wifi(i2c)
         
-        run()
-        runs += 1
+        if (time.time() - last_metric_timestamp) > METRICS_POLL_TIME :
+            print("\nRun: {:d}".format(runs))
+            run()
+            runs += 1
+            last_metric_timestamp = time.time()
+            gc.collect()
+            print("Memory Leak Mode: ", memory_leak_mode)
+            if memory_leak_mode :
+                drip()
 
-        print("Memory Leak Mode: ", memory_leak_mode)
-        if memory_leak_mode :
-            drip()
+        
+        if(RFID_ENABLE) :
+            (stat, tag_type) = reader.request(reader.REQIDL)
+            if stat == reader.OK:
+                (stat, uid) = reader.SelectTagSN()
+                if stat == reader.OK:
+                    card = int.from_bytes(bytes(uid),"little",False)
+                    print("CARD ID: "+str(card))
+                    response = handle_card(str(card))
+                    display = ssd1306.SSD1306_I2C(128, 32, i2c)
+                    display.text(response, 0, 0)
+                    display.show()
 
+
+        #print("Int: " + str(rfid_interrupt.value()))
 
 
     except Exception as e:
@@ -255,4 +319,5 @@ while True:
         except Exception as e1:
             print('An exception handling error occurred:', e1)
 
-    time.sleep(10)
+    utime.sleep_ms(5) 
+
