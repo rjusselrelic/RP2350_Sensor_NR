@@ -9,12 +9,12 @@ import utime
 import os
 import rp2
 import ssd1306
+import newrelic_micropython
 from bh1750 import BH1750
 from machine import Pin, I2C, reset
-import send_sensor_vals
 from credentials import SSID, PASSCODE, NR_API_KEY
 from environment import HOSTNAME, APPNAME, metrics_url, logs_url, WIFI_REGION_CODE, RFID_API_URL, RFID_ENABLE
-from send_sensor_vals import send_log_to_nr, send_env_metric_to_nr, send_trace_to_nr, report_system_metrics, UTC_OFFSET_HOURS
+from newrelic_micropython import send_log_to_nr, send_env_metric_to_nr, send_trace_to_nr, report_system_metrics, UTC_OFFSET_HOURS
 
 
 
@@ -87,8 +87,8 @@ def read_and_set_mode():
     global memory_leak_mode
     memory_leak_list = []
     memory_leak_mode = False    # holding down on sw3 during startup will send demo into memory leak mode
-    send_sensor_vals.memory_leak_mode = memory_leak_mode
-    send_sensor_vals.memory_leak_list = memory_leak_list
+    memory_leak_mode = memory_leak_mode
+    memory_leak_list = memory_leak_list
     print("sw3 value", sw3.value())
     if sw3.value() == 0:
         memory_leak_mode = True
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     # set microcontroller time from NTP
     ntptime.settime()
 
-    send_sensor_vals.report_system_metrics()
+    newrelic_micropython.report_system_metrics()
     
     display = ssd1306.SSD1306_I2C(128, 32, i2c)
     display.text("WIFI CONNECTED", 0, 0)
