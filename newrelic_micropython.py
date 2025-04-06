@@ -122,16 +122,16 @@ def send_trace_to_nr(trace_id, span_id, duration_ms, unix_timestamp):
     span_attributes['duration.ms'] = duration_ms
     span_attributes['name'] = "/get"
     span_attributes['service.name'] ="IOT-Demo"
-    span_attributes['host'] = "rp2350"
+    span_attributes['host'] = HOSTNAME
     
     span = {}
-    
-    
+
+
     span['trace.id'] = trace_id
     span['id'] = span_id
     span['timestamp'] = unix_timestamp * 1000
     span['attributes'] = span_attributes
-    
+
 #    trace['common'] = common_data
     trace['spans'] = [span]
     
