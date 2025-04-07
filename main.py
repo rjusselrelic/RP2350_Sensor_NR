@@ -256,7 +256,7 @@ if __name__ == "__main__":
     
     log_timestamp = time.time()
     log_timestamp += (UTC_OFFSET_HOURS * 3600)
-    send_log_to_nr("RP2350 startup", log_timestamp)
+    send_log_to_nr(HOSTNAME + " startup", log_timestamp)
     if memory_leak_mode:
         send_log_to_nr("Running memory leak demo...", log_timestamp)
         print("Starting memory leak demo")
@@ -300,6 +300,7 @@ while True:
                     display = ssd1306.SSD1306_I2C(128, 32, i2c)
                     display.text(response, 0, 0)
                     display.show()
+                    send_log_to_nr("Read Card: " + response, time.time())
 
 
         #print("Int: " + str(rfid_interrupt.value()))
@@ -318,6 +319,6 @@ while True:
 
         except Exception as e1:
             print('An exception handling error occurred:', e1)
-
+    gc.collect()
     utime.sleep_ms(5) 
 
