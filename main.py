@@ -7,6 +7,7 @@ import requests
 import ntptime
 import utime
 import os
+import random
 import rp2
 import ssd1306
 import newrelic_micropython
@@ -179,9 +180,14 @@ def run():
     display.show()
 
 #add to memory leak
-def drip():
-    print("drip...")
-    memory_leak_list.append(os.urandom(1664))
+def drip():    
+    if gc.mem_free() < 75000 :
+        memory_leak_list.append(os.urandom(random.randint(256,768)))
+        print("drop...")
+    
+    else :
+        memory_leak_list.append(os.urandom(random.randint(16,3200)))
+        print("drip...")
 
 
 def get_api_get(tag, traceparent, tracecontext):
