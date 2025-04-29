@@ -13,7 +13,7 @@ import ssd1306
 import newrelic_micropython
 from bh1750 import BH1750
 from machine import Pin, I2C, reset
-from credentials import SSID, PASSCODE, NR_API_KEY
+from credentials import SSID, PASSCODE, NR_API_KEY, RFID_API_KEY
 from environment import HOSTNAME, APPNAME, metrics_url, logs_url, WIFI_REGION_CODE, RFID_API_URL, RFID_ENABLE
 from newrelic_micropython import send_log_to_nr, send_env_metric_to_nr, send_trace_to_nr, report_system_metrics, UTC_OFFSET_HOURS
 
@@ -33,7 +33,7 @@ GREEN_PIN_NUMBER = 19
 green_led = Pin(GREEN_PIN_NUMBER, Pin.OUT)
 red_led = Pin(RED_PIN_NUMBER, Pin.OUT)
 yellow_led = Pin(YELLOW_PIN_NUMBER, Pin.OUT)
-
+sw2 =  Pin(14, Pin.IN, Pin.PULL_UP)
 sw3 =  Pin(15, Pin.IN, Pin.PULL_UP)
 
 
@@ -199,16 +199,27 @@ def blink(led,secs,speed):
         led.value(0)
         time.sleep(speed)  # Keep LED off for 0.5 seconds
     led.value(0) #Ensure LED is off at the end
-
+     
 def get_api_get(tag, traceparent, tracecontext):
     header_data = {"traceparent": traceparent, "tracestate": "newrelic="+tracecontext}
     print(header_data)
-    rfid_response = requests.get(RFID_API_URL + "/get?tag=" + tag, headers=header_data)
+    #print("sw3 switch value", sw3.value())
+
+    if sw3.value() == 0:
+        header_data["API_KEY"]= RFID_API_KEY
+        payload = {"tag":tag}
+        rfid_response = requests.post(RFID_API_URL + "/add", headers=header_data, json=payload)
+    if sw2.value() == 0:
+        header_data["API_KEY"]= RFID_API_KEY
+        rfid_response = requests.get(RFID_API_URL + "/del?tag=" + tag, headers=header_data)
+    else:
+        rfid_response = requests.get(RFID_API_URL + "/get?tag=" + tag, headers=header_data)
+
     print(rfid_response.status_code)
     print(rfid_response.text)
     if(rfid_response.status_code == 200) :
-        return rfid_response.text
-    return "DENIED"
+        return rfid_response.text, rfid_response.status_code
+    return "ACCESS DENIED: "+rfid_response.text, rfid_response.status_code
 
 
 def handle_card(tag_id) :
@@ -221,13 +232,13 @@ def handle_card(tag_id) :
     span_id_string = ''.join('{:02x}'.format(x) for x in span_id_bytes)
 
     traceparent = "00-" + trace_id_string + "-" + span_id_string + "-01"    
-    response_text = get_api_get(tag_id, traceparent, span_id_string)
+    response_text, response_code = get_api_get(tag_id, traceparent, span_id_string)
     stop_ms = utime.ticks_ms()
     
     duration_ms = stop_ms - start_ms
     send_trace_to_nr(trace_id_string, span_id_string, duration_ms, time.time())
     
-    return response_text
+    return response_text,response_code
 
 
 if __name__ == "__main__":
@@ -313,11 +324,13 @@ while True:
                 if stat == reader.OK:
                     card = int.from_bytes(bytes(uid),"little",False)
                     print("CARD ID: "+str(card))
-                    response = handle_card(str(card))
+                    response,response_code = handle_card(str(card))
+                    #print("RESPONSE: ",str(response))
+                    #print("CODE: ",str(response_code))
                     display = ssd1306.SSD1306_I2C(128, 32, i2c)
                     display.text(response, 0, 0)
                     display.show()
-                    if not response == 'DENIED':
+                    if response_code == 200:
                         blink(green_led,2,0.25)
                     else:
                         blink(red_led,2,0.25)
